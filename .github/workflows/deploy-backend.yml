@@ -32,7 +32,9 @@ jobs:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
     
     - name: Configure Docker for GCR
-      run: gcloud auth configure-docker gcr.io --quiet
+      run: |
+        gcloud auth configure-docker gcr.io --quiet
+        gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
     
     - name: Build Docker image
       run: |
