@@ -37,20 +37,16 @@ jobs:
         gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
     
     - name: Run Database Migrations
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
       run: |
-        # Install PostgreSQL client
-        sudo apt-get update && sudo apt-get install -y postgresql-client python3-psycopg2
+        # Get DATABASE_URL from Secret Manager
+        echo "Getting DATABASE_URL from Secret Manager..."
+        export DATABASE_URL=$(gcloud secrets versions access latest --secret=DATABASE_URL --project=$PROJECT_ID)
         
-        # Get DATABASE_URL from secret (if not in env, get from Secret Manager)
-        if [ -z "$DATABASE_URL" ]; then
-          echo "Getting DATABASE_URL from Secret Manager..."
-          DATABASE_URL=$(gcloud secrets versions access latest --secret=DATABASE_URL --project=$PROJECT_ID)
-        fi
+        # Install PostgreSQL client and Python dependencies
+        sudo apt-get update && sudo apt-get install -y postgresql-client
+        pip3 install psycopg2-binary
         
         # Run migrations
-        export DATABASE_URL
         cd backend
         python3 run_migrations.py
     
