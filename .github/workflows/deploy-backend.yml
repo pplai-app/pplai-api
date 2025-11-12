@@ -57,15 +57,25 @@ jobs:
         
         # Run migrations using psql
         export PGPASSWORD=$DB_PASSWORD
-        cd backend/migrations
+        
+        # Navigate to migrations directory (we're at repo root after checkout)
+        MIGRATIONS_DIR="backend/migrations"
+        if [ ! -d "$MIGRATIONS_DIR" ]; then
+          echo "❌ Migrations directory not found: $MIGRATIONS_DIR"
+          echo "Current directory: $(pwd)"
+          echo "Contents: $(ls -la)"
+          exit 1
+        fi
         
         echo "Running schema.sql..."
-        psql -h localhost -U postgres -d pplai -f schema.sql || echo "Schema may already exist"
+        psql -h localhost -U postgres -d pplai -f $MIGRATIONS_DIR/schema.sql || echo "Schema may already exist"
         
         echo "Running additional migrations..."
-        for migration in add_*.sql; do
-          echo "Running $migration..."
-          psql -h localhost -U postgres -d pplai -f $migration || echo "$migration may already be applied"
+        for migration in $MIGRATIONS_DIR/add_*.sql; do
+          if [ -f "$migration" ]; then
+            echo "Running $(basename $migration)..."
+            psql -h localhost -U postgres -d pplai -f $migration || echo "$(basename $migration) may already be applied"
+          fi
         done
         
         # Stop Cloud SQL Proxy
