@@ -58,8 +58,8 @@ jobs:
         # Run migrations using psql
         export PGPASSWORD=$DB_PASSWORD
         
-        # Navigate to migrations directory (we're at repo root after checkout)
-        MIGRATIONS_DIR="backend/migrations"
+        # Migrations directory (in pplai-api repo, migrations are at root)
+        MIGRATIONS_DIR="migrations"
         if [ ! -d "$MIGRATIONS_DIR" ]; then
           echo "❌ Migrations directory not found: $MIGRATIONS_DIR"
           echo "Current directory: $(pwd)"
