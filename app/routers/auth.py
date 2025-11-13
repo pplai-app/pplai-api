@@ -115,21 +115,26 @@ async def email_login(
     db: Session = Depends(get_db)
 ):
     """Handle email-based login/signup with password"""
-    logger.info(f"Email login attempt for email: {request.email}")
     start_time = time.time()
     is_signup = False
     
+    # Validate email
     if not request.email:
+        logger.warning("Email login attempt with missing email")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email is required"
         )
     
+    # Validate password
     if not request.password:
+        logger.warning(f"Email login attempt with missing password for: {request.email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password is required"
         )
+    
+    logger.info(f"Email login attempt for email: {request.email}")
 
     # Check if user exists
     try:

@@ -117,24 +117,42 @@ async def global_exception_handler(request, exc):
     import logging
     import traceback
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.exceptions import RequestValidationError
+    from pydantic import ValidationError
     
-    # Log full error details server-side only (not exposed to client)
-    logger = logging.getLogger(__name__)
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    
-    # Report to GCP Error Reporting
-    from app.logging_config import error_client
-    if error_client:
-        try:
-            error_client.report_exception()
-        except:
-            pass
-    
-    # Return generic error message to client with CORS headers
-    response = JSONResponse(
-        status_code=500,
-        content={"error": "Internal server error"}
-    )
+    # Handle Pydantic validation errors (400 Bad Request)
+    if isinstance(exc, RequestValidationError):
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Validation error: {exc.errors()}")
+        errors = exc.errors()
+        error_messages = []
+        for error in errors:
+            field = ".".join(str(loc) for loc in error.get("loc", []))
+            msg = error.get("msg", "Invalid value")
+            error_messages.append(f"{field}: {msg}")
+        
+        response = JSONResponse(
+            status_code=400,
+            content={"error": "Validation error", "detail": "; ".join(error_messages)}
+        )
+    else:
+        # Log full error details server-side only (not exposed to client)
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unhandled exception: {exc}", exc_info=True)
+        
+        # Report to GCP Error Reporting
+        from app.logging_config import error_client
+        if error_client:
+            try:
+                error_client.report_exception()
+            except:
+                pass
+        
+        # Return generic error message to client with CORS headers
+        response = JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"}
+        )
     
     # Add CORS headers to error response
     origin = request.headers.get("origin")
