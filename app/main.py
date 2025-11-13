@@ -59,6 +59,14 @@ else:
     ]
     # Filter out empty strings
     cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+    
+    # In production, also add HTTPS version of frontend URL if it's HTTP
+    if os.getenv('ENVIRONMENT', 'development') != 'development':
+        if frontend_url.startswith('http://'):
+            https_url = frontend_url.replace('http://', 'https://')
+            if https_url not in cors_origins:
+                cors_origins.append(https_url)
+                logger.info(f"CORS: Added HTTPS version: {https_url}")
 
 logger.info(f"CORS: Allowing origins: {cors_origins}")
 
