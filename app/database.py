@@ -1,6 +1,8 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError, DisconnectionError
+from fastapi import HTTPException
 import os
 import time
 import logging
@@ -60,7 +62,6 @@ def receive_after_cursor_execute(conn, cursor, statement, parameters, context, e
 def get_db():
     """Dependency for getting database session"""
     from sqlalchemy import text
-    from sqlalchemy.exc import OperationalError, DisconnectionError
     import time
     
     db = None
@@ -118,7 +119,6 @@ def get_db():
                 except:
                     pass
                 # Re-raise as HTTP 503
-                from fastapi import HTTPException
                 raise HTTPException(
                     status_code=503,
                     detail="Database connection lost. Please try again."
@@ -144,7 +144,6 @@ def get_db():
         except Exception as e:
             if attempt == max_retries - 1:
                 logger.error(f"Failed to create database session after {max_retries} attempts: {e}", exc_info=True)
-                from fastapi import HTTPException
                 raise HTTPException(
                     status_code=503,
                     detail="Database unavailable. Please try again later."
@@ -152,7 +151,6 @@ def get_db():
             time.sleep(retry_delay * (attempt + 1))
     
     # Should not reach here, but just in case
-    from fastapi import HTTPException
     raise HTTPException(
         status_code=503,
         detail="Database connection failed"
