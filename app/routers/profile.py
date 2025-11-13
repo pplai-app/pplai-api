@@ -200,6 +200,9 @@ async def get_profile_qr(
         else:
             # Generate URL QR code
             frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8080')
+            # Force HTTPS in production (Cloud Run)
+            if os.getenv('ENVIRONMENT', 'development') != 'development' and frontend_url.startswith('http://'):
+                frontend_url = frontend_url.replace('http://', 'https://')
             profile_url = f"{frontend_url}/profile/{user_id}"
             qr_data = profile_url
 
@@ -282,6 +285,9 @@ def generate_vcard_from_user(user):
     
     # Add pplai.app profile URL
     frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8080')
+    # Force HTTPS in production (Cloud Run)
+    if os.getenv('ENVIRONMENT', 'development') != 'development' and frontend_url.startswith('http://'):
+        frontend_url = frontend_url.replace('http://', 'https://')
     pplai_profile_url = f"{frontend_url}/profile/{user.id}"
     vcard += f"URL;TYPE=PPLAI:{escape_vcard_value(pplai_profile_url)}\n"
     
