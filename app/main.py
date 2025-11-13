@@ -26,8 +26,9 @@ else:
     load_dotenv()
     logger.warning(f"{env_file} not found, using .env (if exists)")
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Note: Database tables are created via migrations, not here
+# Base.metadata.create_all() is removed to avoid connection issues at startup
+# Migrations are run in CI/CD before deployment
 
 app = FastAPI(
     title="pplai.app API",
