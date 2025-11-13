@@ -60,31 +60,101 @@ def receive_after_cursor_execute(conn, cursor, statement, parameters, context, e
 def get_db():
     """Dependency for getting database session"""
     from sqlalchemy import text
-    db = SessionLocal()
-    try:
-        # Test connection before yielding (quick ping)
+    from sqlalchemy.exc import OperationalError, DisconnectionError
+    import time
+    
+    db = None
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
         try:
-            db.execute(text("SELECT 1"))
-        except Exception as conn_error:
-            logger.error(f"Database connection test failed: {conn_error}", exc_info=True)
-            try:
-                db.rollback()
-                db.close()
-            except:
-                pass
-            # Recreate session
             db = SessionLocal()
-        yield db
-    except Exception as e:
-        logger.error(f"Database session error: {e}", exc_info=True)
-        try:
-            db.rollback()
-        except:
-            pass
-        raise
-    finally:
-        try:
-            db.close()
-        except:
-            pass
+            # Test connection before yielding (quick ping)
+            try:
+                db.execute(text("SELECT 1"))
+                db.commit()  # Commit the test query
+            except (OperationalError, DisconnectionError) as conn_error:
+                logger.warning(f"Database connection test failed (attempt {attempt + 1}/{max_retries}): {conn_error}")
+                try:
+                    db.rollback()
+                    db.close()
+                except:
+                    pass
+                db = None
+                
+                # If not last attempt, wait and retry
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                    continue
+                else:
+                    # Last attempt failed, raise error
+                    logger.error(f"Database connection failed after {max_retries} attempts", exc_info=True)
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database connection unavailable. Please try again later."
+                    )
+            except Exception as conn_error:
+                logger.error(f"Unexpected error during connection test: {conn_error}", exc_info=True)
+                try:
+                    db.rollback()
+                    db.close()
+                except:
+                    pass
+                db = None
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                else:
+                    raise
+            
+            # Connection successful, yield the session
+            try:
+                yield db
+            except (OperationalError, DisconnectionError) as e:
+                logger.error(f"Database session error during request: {e}", exc_info=True)
+                try:
+                    db.rollback()
+                except:
+                    pass
+                # Re-raise as HTTP 503
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database connection lost. Please try again."
+                )
+            except Exception as e:
+                logger.error(f"Database session error: {e}", exc_info=True)
+                try:
+                    db.rollback()
+                except:
+                    pass
+                raise
+            finally:
+                # Always close the session
+                if db:
+                    try:
+                        db.close()
+                    except:
+                        pass
+            return  # Success, exit retry loop
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to create database session after {max_retries} attempts: {e}", exc_info=True)
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database unavailable. Please try again later."
+                )
+            time.sleep(retry_delay * (attempt + 1))
+    
+    # Should not reach here, but just in case
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=503,
+        detail="Database connection failed"
+    )
 
