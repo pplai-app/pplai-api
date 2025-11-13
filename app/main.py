@@ -39,15 +39,28 @@ app = FastAPI(
 # CORS middleware - MUST be added before routes
 # Get allowed origins from environment or use defaults
 frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8080')
-cors_origins = os.getenv('CORS_ORIGINS', '').split(',') if os.getenv('CORS_ORIGINS') else [
-    frontend_url,
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-# Filter out empty strings
-cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+cors_origins_env = os.getenv('CORS_ORIGINS', '')
+
+# If CORS_ORIGINS is explicitly set, use it
+if cors_origins_env:
+    cors_origins = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+# If FRONTEND_URL is wildcard (*), allow all origins (for production flexibility)
+elif frontend_url == '*':
+    cors_origins = ['*']
+    logger.info("CORS: Allowing all origins (FRONTEND_URL=*)")
+# Otherwise use defaults including FRONTEND_URL
+else:
+    cors_origins = [
+        frontend_url,
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    # Filter out empty strings
+    cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+
+logger.info(f"CORS: Allowing origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
